@@ -1,1 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Principals Analytics Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Plotly -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- DataTables -->
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+  
+  <style>
+    :root {
+      --primary: #4361ee;
+      --secondary: #3f37c9;
+      --success: #4cc9f0;
+      --danger: #f72585;
+      --warning: #f8961e;
+      --info: #4895ef;
+      --light: #f8f9fa;
+      --dark: #212529;
+    }
+    
+    body { 
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+      color: #e2e8f0; 
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+    }
+    
+    .glass { 
+      background: rgba(255, 255, 255, 0.05); 
+      border: 1px solid rgba(255, 255, 255, 0.1); 
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      transition: all 0.3s ease;
+    }
+    
+    .glass:hover {
+      background: rgba(255, 255, 255, 0.08);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+    
+    .kpi-card { 
+      transition: transform 0.3s ease, box-shadow 0.3s ease; 
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--primary), var(--success));
+    }
+    
+    .kpi-card:hover { 
+      transform: translateY(-5px); 
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    }
+    
+    .progress-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+    }
+    
+    .progress-value {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--primary), var(--success));
+      transition: width 1s ease-in-out;
+    }
+    
+    .card-title { 
+      letter-spacing: 0.5px; 
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .nav-tab {
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .nav-tab.active {
+      background: rgba(67, 97, 238, 0.15);
+      color: #60a5fa;
+    }
+    
+    .nav-tab:hover:not(.active) {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* DataTables customization */
+    .dataTables_wrapper {
+      color: #cbd5e1;
+    }
+    
+    .dataTables_filter input {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+    
+    .dataTables_length select {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+    
+    .dataTables_info {
+      color: #94a3b8 !important;
+    }
+    
+    .dataTables_paginate .paginate_button {
+      color: #94a3b8 !important;
+      background: rgba(255, 255, 255, 0.05) !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      border-radius: 6px;
+      margin: 0 4px;
+      padding: 6px 12px;
+    }
+    
+    .dataTables_paginate .paginate_button:hover {
+      background: rgba(67, 97, 238, 0.2) !important;
+      color: white !important;
+    }
+    
+    .dataTables_paginate .paginate_button.current {
+      background: rgba(67, 97, 238, 0.3) !important;
+      color: white !important;
+      border: 1px solid var(--primary) !important;
+    }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <header class="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
+    <div>
+      <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+        <i class="fas fa-chart-network mr-2"></i>Principals Analytics Dashboard
+      </h1>
+      <p class="text-slate-400 mt-1">Comprehensive analysis of principals data</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="flex glass rounded-lg overflow-hidden">
+        <div class="nav-tab active" data-tab="overview">
+          <i class="fas fa-chart-pie mr-2"></i>Overview
+        </div>
+        <div class="nav-tab" data-tab="data-quality">
+          <i class="fas fa-database mr-2"></i>Data Quality
+        </div>
+        <div class="nav-tab" data-tab="geographic">
+          <i class="fas fa-map-marked-alt mr-2"></i>Geographic
+        </div>
+      </div>
+      <a href="/download/csv" class="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white flex items-center">
+        <i class="fas fa-file-export mr-2"></i>Export CSV
+      </a>
+    </div>
+  </header>
 
+  <!-- Overview Tab -->
+  <div id="overview-tab" class="tab-content">
+    <!-- KPI Row -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-4 mb-8">
+      <div class="glass p-4 rounded-xl kpi-card col-span-2">
+        <p class="text-xs text-slate-400 mb-1"><i class="fas fa-layer-group mr-1"></i>Total Records</p>
+        <p id="kpi-total" class="text-2xl font-semibold">—</p>
+        <div class="progress-bar mt-2">
+          <div class="progress-value" style="width: 100%"></div>
+        </div>
+      </div>
+      <div class="glass p-4 rounded-xl kpi-card">
+        <p class="text-xs text-slate-400 mb-1"><i class="fas fa-flag mr-1"></i>States</p>
+        <p id="kpi-states" class="text-2xl font-semibold">—</p>
+      </div>
+      <div class="glass p-4 rounded-xl kpi-card">
+        <p class="text-xs text-slate-400 mb-1"><i class="fas fa-city mr-1"></i>Cities</p>
+        <p id="kpi-cities" class="text-2xl font-semibold">—</p>
+      </div>
+      <div class="glass p-4 rounded-xl kpi-card">
+        <p class="text-xs text-slate-400 mb-1"><i class="fas fa-user-tie mr-1"></i>Unique Principals</p>
+        <p id="kpi-principals" class="text-2xl font-semibold">—</p>
+      </div>
+      <div class="glass p-4 rounded-xl kpi-card">
+        <p class="text-xs text-slate-400 mb-1"><i class="fas fa-phone-alt mr-1"></i>Phones Present</p>
+        <p id="kpi-phones" class="text-2xl font-semibold">—</p>
+        <div class="progress-bar mt-2">
+          <div id="kpi-phones-progress" class="progress-value" style="width: 0%"></div>
+        </div>
+      </div>
+      <div class="glass p-4 rounded-xl kpi-card">
+        <p class="text-xs text-slate-400 mb-1"><i class="fas fa-copy mr-1"></i>Potential Duplicates</p>
+        <p id="kpi-dupes" class="text-2xl font-semibold">—</p>
+      </div>
+    </section>
+
+    <!-- Data Quality Scores -->
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="glass p-5 rounded-xl">
+        <h2 class="card-title mb-4"><i class="fas fa-tasks"></i> Data Completeness</h2>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm">Overall Score</span>
+          <span id="completeness-score" class="text-xl font-bold">—</span>
+        </div>
+        <div class="progress-bar mb-6">
+          <div id="completeness-progress" class="progress-value" style="width: 0%"></div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div class="text-center">
+            <div class="text-2xl font-bold" id="complete-fields">—</div>
+            <div class="text-xs text-slate-400">Complete Fields</div>
+          </div>
+          <div class="text-center">
+            <div class="text-2xl font-bold" id="incomplete-fields">—</div>
+            <div class="text-xs text-slate-400">Incomplete Fields</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="glass p-5 rounded-xl">
+        <h2 class="card-title mb-4"><i class="fas fa-star"></i> Data Quality Score</h2>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm">Overall Rating</span>
+          <span id="quality-score" class="text-xl font-bold">—</span>
+        </div>
+        <div class="progress-bar mb-6">
+          <div id="quality-progress" class="progress-value" style="width: 0%"></div>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-2">
+          <div class="text-center">
+            <div class="text-lg font-bold" id="completeness-pct">—</div>
+            <div class="text-xs text-slate-400">Completeness</div>
+          </div>
+          <div class="text-center">
+            <div class="text-lg font-bold" id="uniqueness-pct">—</div>
+            <div class="text-xs text-slate-400">Uniqueness</div>
+          </div>
+          <div class="text-center">
+            <div class="text-lg font-bold" id="consistency-pct">—</div>
+            <div class="text-xs text-slate-400">Consistency</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Charts Row 1 -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div class="glass p-5 rounded-xl">
+        <h2 class="card-title mb-4"><i class="fas fa-chart-bar"></i> Top States by Principals</h2>
+        <div id="chart-states" style="height:360px;"></div>
+      </div>
+      <div class="glass p-5 rounded-xl">
+        <h2 class="card-title mb-4"><i class="fas fa-city"></i> Top Cities by Principals</h2>
+        <div id="chart-cities" style="height:360px;"></div>
+      </div>
+    </section>
+
+    <!-- Charts Row 2 -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div class="glass p-5 rounded-xl">
+        <h2 class="card-title mb-4"><i class="fas fa-phone"></i> Phone Data Completeness</h2>
+        <div id="chart-phones" style="height:320px;"></div>
+      </div>
+      <div class="glass p-5 rounded-xl">
+        <h2 class="card-title mb-4"><i class="fas fa-copy"></i> Duplicates vs Unique</h2>
+        <div id="chart-dupes" style="height:320px;"></div>
+      </div>
+    </section>
+
+    <!-- Charts Row 3 -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div class="glass p-5 rounded-xl">
+        <h2 class="card-title mb-4"><i class="fas fa-percentage"></i> Phones Present Rate by State</h2>
+        <div id="chart-phones-rate" style="height:340px;"></div>
+      </div>
+      <div class="glass p-5 rounded-xl">
+        <h2 class="card-title mb-4"><i class="fas fa-project-diagram"></i> Predicted Growth (Trend)</h2>
+        <div id="chart-predictions" style="height:340px;"></div>
+      </div>
+    </section>
+
+    <!-- Charts Row 4 -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div class="glass p-5 rounded-xl">
+        <h2 class="card-title mb-4"><i class="fas fa-tree"></i> Distribution by State (Treemap)</h2>
+        <div id="chart-treemap" style="height:360px;"></div>
+      </div>
+      <div class="glass p-5 rounded-xl">
+        <h2 class="card-title mb-4"><i class="fas fa-th"></i> State × City Heatmap</h2>
+        <div id="chart-heatmap" style="height:360px;"></div>
+      </div>
+    </section>
+
+    <!-- Data Table -->
+    <section class="glass p-5 rounded-xl mb-8">
+      <h2 class="card-title mb-4"><i class="fas fa-table"></i> Explore Records</h2>
+      <div class="overflow-auto">
+        <table id="dataTable" class="display" style="width:100%">
+          <thead>
+            <tr id="tableHead"></tr>
+          </thead>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Data Quality Tab -->
+  <div id="data-quality-tab" class="tab-content hidden">
+    <section class="glass p-6 rounded-xl mb-8">
+      <h2 class="card-title mb-5"><i class="fas fa-database"></i> Column Analysis</h2>
+      <div id="column-analysis" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Will be populated by JavaScript -->
+      </div>
+    </section>
+  </div>
+
+  <!-- Geographic Tab -->
+  <div id="geographic-tab" class="tab-content hidden">
+    <section class="glass p-6 rounded-xl mb-8">
+      <h2 class="card-title mb-5"><i class="fas fa-map-marked-alt"></i> Geographic Distribution</h2>
+      <div id="geo-chart" style="height:500px;"></div>
+    </section>
+  </div>
+
+  <footer class="text-center text-slate-500 text-sm mt-12 py-6 border-t border-slate-800">
+    <p>Principals Analytics Dashboard • Powered by Flask & Plotly • <span id="current-year"></span></p>
+  </footer>
+
+  <script>
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+    
+    const fmt = n => (n ?? 0).toLocaleString();
+    const pct = n => Math.round((n ?? 0) * 100) + '%';
+    
+    // Tab navigation
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+        
+        tab.classList.add('active');
+        const tabName = tab.getAttribute('data-tab');
+        document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+        
+        // Load tab-specific data
+        if (tabName === 'data-quality') loadDataQuality();
+        if (tabName === 'geographic') loadGeographic();
+      });
+    });
+    
+    // Format numbers with K, M suffixes
+    function formatNumber(num) {
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+      }
+      if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num;
+    }
+
+    async function loadSummary(){
+      try {
+        const response = await fetch('/api/summary');
+        const s = await response.json();
+        
+        document.getElementById('kpi-total').innerText = fmt(s.total_records);
+        document.getElementById('kpi-states').innerText = fmt(s.unique_states);
+        document.getElementById('kpi-cities').innerText = fmt(s.unique_cities);
+        document.getElementById('kpi-principals').innerText = fmt(s.unique_principals);
+        document.getElementById('kpi-phones').innerText = `${fmt(s.phones_present)} (${Math.round(100*s.phones_present/s.total_records)}%)`;
+        document.getElementById('kpi-dupes').innerText = fmt(s.potential_duplicates);
+        
+        // Update progress bars
+        const phonePct = s.total_records ? s.phones_present / s.total_records : 0;
+        document.getElementById('kpi-phones-progress').style.width = `${phonePct * 100}%`;
+        
+        // Data quality scores
+        document.getElementById('completeness-score').textContent = `${s.completeness_score || 0}/100`;
+        document.getElementById('completeness-progress').style.width = `${s.completeness_score || 0}%`;
+        
+        document.getElementById('quality-score').textContent = `${s.data_quality_score || 0}/100`;
+        document.getElementById('quality-progress').style.width = `${s.data_quality_score || 0}%`;
+        
+        // Simplified metrics for display
+        document.getElementById('complete-fields').textContent = pct(s.completeness_score / 100);
+        document.getElementById('incomplete-fields').textContent = pct(1 - (s.completeness_score / 100));
+        
+        document.getElementById('completeness-pct').textContent = pct(s.completeness_score / 100);
+        document.getElementById('uniqueness-pct').textContent = s.total_records ? pct(s.unique_principals / s.total_records) : '0%';
+        document.getElementById('consistency-pct').textContent = s.unique_states ? pct(1 / s.unique_states) : '0%';
+
+        // Phones pie chart
+        Plotly.newPlot('chart-phones', [{
+          type: 'pie',
+          hole: 0.6,
+          labels: ['Present', 'Missing'],
+          values: [s.phones_present, s.phones_missing],
+          marker: {
+            colors: ['#4361ee', '#f72585']
+          },
+          textinfo: 'label+percent',
+          textposition: 'inside',
+          hoverinfo: 'label+value+percent'
+        }], {
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#e2e8f0' },
+          showlegend: false
+        }, {displayModeBar: false});
+
+        // Duplicates pie chart
+        Plotly.newPlot('chart-dupes', [{
+          type: 'pie',
+          hole: 0.6,
+          labels: ['Unique-ish', 'Potential Duplicates'],
+          values: [s.total_records - s.potential_duplicates, s.potential_duplicates],
+          marker: {
+            colors: ['#4cc9f0', '#f8961e']
+          },
+          textinfo: 'label+percent',
+          textposition: 'inside',
+          hoverinfo: 'label+value+percent'
+        }], {
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#e2e8f0' },
+          showlegend: false
+        }, {displayModeBar: false});
+      } catch (error) {
+        console.error('Error loading summary:', error);
+      }
+    }
+
+    async function loadTopStates(){
+      try {
+        const response = await fetch('/api/top-states?limit=12');
+        const data = await response.json();
+        
+        Plotly.newPlot('chart-states', [{
+          type: 'bar',
+          x: data.map(d => d.State),
+          y: data.map(d => d.count),
+          marker: {
+            color: '#4361ee'
+          }
+        }], {
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          margin: {t: 20, l: 40, b: 80, r: 20},
+          font: { color: '#e2e8f0' },
+          xaxis: {
+            tickangle: -45
+          },
+          yaxis: {
+            gridcolor: 'rgba(255,255,255,0.1)'
+          }
+        }, {displayModeBar: false});
+      } catch (error) {
+        console.error('Error loading top states:', error);
+      }
+    }
+
+    async function loadTopCities(){
+      try {
+        const response = await fetch('/api/top-cities?limit=15');
+        const data = await response.json();
+        
+        Plotly.newPlot('chart-cities', [{
+          type: 'bar',
+          orientation: 'h',
+          x: data.map(d => d.count),
+          y: data.map(d => d.City),
+          marker: {
+            color: '#4895ef'
+          }
+        }], {
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          margin: {t: 20, l: 150, b: 40, r: 20},
+          font: { color: '#e2e8f0' },
+          xaxis: {
+            gridcolor: 'rgba(255,255,255,0.1)'
+          }
+        }, {displayModeBar: false});
+      } catch (error) {
+        console.error('Error loading top cities:', error);
+      }
+    }
+
+    async function loadPhonesByState(){
+      try {
+        const response = await fetch('/api/phones-by-state');
+        const data = await response.json();
+        
+        Plotly.newPlot('chart-phones-rate', [{
+          type: 'scatter',
+          mode: 'lines+markers',
+          x: data.map(d => d.State),
+          y: data.map(d => d.rate * 100),
+          line: {
+            shape: 'spline',
+            color: '#4cc9f0'
+          },
+          marker: {
+            color: '#4cc9f0',
+            size: 8
+          }
+        }], {
+          yaxis: {
+            title: '% Phones Present',
+            gridcolor: 'rgba(255,255,255,0.1)'
+          },
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#e2e8f0' },
+          xaxis: {
+            tickangle: -45,
+            gridcolor: 'rgba(255,255,255,0.1)'
+          }
+        }, {displayModeBar: false});
+      } catch (error) {
+        console.error('Error loading phones by state:', error);
+      }
+    }
+
+    async function loadTreemap(){
+      try {
+        const response = await fetch('/api/treemap-states');
+        const data = await response.json();
+        
+        Plotly.newPlot('chart-treemap', [{
+          type: 'treemap',
+          labels: data.map(d => d.State),
+          parents: data.map(() => ''),
+          values: data.map(d => d.count),
+          textinfo: 'label+value+percent parent',
+          textposition: 'middle center',
+          marker: {
+            colors: ['#4361ee', '#4895ef', '#4cc9f0', '#f72585', '#f8961e', '#7209b7', '#3a0ca3', '#4cc9f0', '#f8961e', '#7209b7']
+          }
+        }], {
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          margin: {t: 0, l: 0, b: 0, r: 0},
+          font: { color: '#e2e8f0', size: 14 }
+        }, {displayModeBar: false});
+      } catch (error) {
+        console.error('Error loading treemap:', error);
+      }
+    }
+
+    async function loadHeatmap(){
+      try {
+        const response = await fetch('/api/state-city-heatmap');
+        const d = await response.json();
+        
+        Plotly.newPlot('chart-heatmap', [{
+          type: 'heatmap',
+          z: d.z,
+          x: d.states,
+          y: d.cities,
+          colorscale: 'Blues',
+          colorbar: {
+            tickfont: { color: '#e2e8f0' }
+          }
+        }], {
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          margin: {t: 30, l: 100, b: 50, r: 30},
+          font: { color: '#e2e8f0' },
+          xaxis: {
+            tickangle: -45
+          }
+        }, {displayModeBar: false});
+      } catch (error) {
+        console.error('Error loading heatmap:', error);
+      }
+    }
+
+    async function loadPredictions(){
+      try {
+        const response = await fetch('/api/predictions');
+        const d = await response.json();
+        
+        const isTimeSeries = d.history[0] && d.history[0].period;
+        
+        Plotly.newPlot('chart-predictions', [
+          {
+            type: 'bar',
+            x: d.history.map(x => x.State || x.period),
+            y: d.history.map(x => x.count),
+            name: 'History',
+            marker: {
+              color: '#4361ee'
+            }
+          },
+          {
+            type: 'scatter',
+            mode: 'lines+markers',
+            x: d.predictions.map(x => x.State || x.future_index || x.period),
+            y: d.predictions.map(x => x.predicted),
+            name: 'Prediction',
+            line: {
+              color: '#f8961e',
+              dash: 'dash'
+            },
+            marker: {
+              color: '#f8961e',
+              size: 8
+            }
+          }
+        ], {
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#e2e8f0' },
+          xaxis: {
+            gridcolor: 'rgba(255,255,255,0.1)',
+            tickangle: isTimeSeries ? 0 : -45
+          },
+          yaxis: {
+            gridcolor: 'rgba(255,255,255,0.1)'
+          }
+        }, {displayModeBar: false});
+      } catch (error) {
+        console.error('Error loading predictions:', error);
+      }
+    }
+
+    async function loadDataTable(){
+      try {
+        if ($.fn.DataTable.isDataTable('#dataTable')) {
+          $('#dataTable').DataTable().destroy();
+        }
+        
+        const table = $('#dataTable').DataTable({
+          processing: true,
+          serverSide: true,
+          ajax: {
+            url: '/api/table',
+            type: 'GET'
+          },
+          columns: [
+            // Will be dynamically set based on API response
+          ],
+          order: [[0, 'asc']],
+          pageLength: 25,
+          lengthMenu: [10, 25, 50, 100],
+          language: {
+            search: "_INPUT_",
+            searchPlaceholder: "Search records...",
+            lengthMenu: "Show _MENU_ entries",
+            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+            infoEmpty: "Showing 0 to 0 of 0 entries",
+            infoFiltered: "(filtered from _MAX_ total entries)"
+          },
+          dom: '<"flex justify-between items-center mb-4"<"flex"l><"flex"f>>rt<"flex justify-between items-center mt-4"<"flex"i><"flex"p>>'
+        });
+        
+        // Style the table for dark mode
+        $('.dataTables_length select').addClass('bg-slate-800 text-white border-slate-700');
+        $('.dataTables_filter input').addClass('bg-slate-800 text-white border-slate-700');
+      } catch (error) {
+        console.error('Error loading data table:', error);
+      }
+    }
+    
+    async function loadDataQuality() {
+      try {
+        const response = await fetch('/api/data-quality');
+        const data = await response.json();
+        
+        const container = document.getElementById('column-analysis');
+        container.innerHTML = '';
+        
+        for (const [col, metrics] of Object.entries(data)) {
+          const card = document.createElement('div');
+          card.className = 'glass p-4 rounded-lg';
+          card.innerHTML = `
+            <h3 class="font-semibold mb-2 text-blue-300">${col}</h3>
+            <div class="grid grid-cols-2 gap-2 mb-3">
+              <div class="text-sm">Completeness</div>
+              <div class="text-sm text-right">${metrics.non_null}/${metrics.total} (${metrics.null_pct}%)</div>
+            </div>
+            <div class="progress-bar mb-3">
+              <div class="progress-value" style="width: ${100 - metrics.null_pct}%"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div class="text-sm">Uniqueness</div>
+              <div class="text-sm text-right">${metrics.unique} (${metrics.unique_pct}%)</div>
+            </div>
+            <div class="text-xs text-slate-400 mt-2">Sample values:</div>
+            <div class="text-xs truncate">${metrics.sample_values.join(', ') || 'N/A'}</div>
+          `;
+          container.appendChild(card);
+        }
+      } catch (error) {
+        console.error('Error loading data quality:', error);
+      }
+    }
+    
+    async function loadGeographic() {
+      try {
+        const response = await fetch('/api/geographic-distribution');
+        const data = await response.json();
+        
+        // Create a simple choropleth using a bar chart for now
+        // In a real implementation, you would use a proper map library
+        const states = Object.keys(data);
+        const counts = Object.values(data);
+        
+        Plotly.newPlot('geo-chart', [{
+          type: 'bar',
+          x: states,
+          y: counts,
+          marker: {
+            color: counts,
+            colorscale: 'Blues',
+            colorbar: {
+              tickfont: { color: '#e2e8f0' }
+            }
+          }
+        }], {
+          title: 'Distribution by State',
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#e2e8f0' },
+          xaxis: {
+            tickangle: -45,
+            gridcolor: 'rgba(255,255,255,0.1)'
+          },
+          yaxis: {
+            gridcolor: 'rgba(255,255,255,0.1)'
+          }
+        }, {displayModeBar: false});
+      } catch (error) {
+        console.error('Error loading geographic data:', error);
+      }
+    }
+
+    (async function init(){
+      await loadSummary();
+      await loadTopStates();
+      await loadTopCities();
+      await loadPhonesByState();
+      await loadTreemap();
+      await loadHeatmap();
+      await loadPredictions();
+      await loadDataTable();
+    })();
+  </script>
+</body>
+</html>
